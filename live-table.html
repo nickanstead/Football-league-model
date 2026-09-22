@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Premier League Predictions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0E1B2A; --surface:#16283D; --surface-2:#1C3350; --line:#2A415F;
+    --text:#EDEFEF; --text-dim:#9FB1C4; --amber:#F2A93B; --teal:#4FA8A0; --red:#E0654F;
+    font-family:'Inter',system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:var(--bg); color:var(--text); }
+  body { padding:24px 16px 40px; max-width:720px; margin:0 auto; }
+  h1 { font-size:24px; margin:0 0 4px; }
+  .updated { font-size:12.5px; color:var(--text-dim); margin:0 0 20px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th,td { padding:9px 6px; text-align:right; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums; }
+  th:nth-child(2), td:nth-child(2) { text-align:left; }
+  th { color:var(--text-dim); font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:0.03em; }
+  td.title { color:var(--amber); font-weight:600; }
+  td.releg { color:var(--red); font-weight:600; }
+  .note { font-size:12.5px; color:var(--text-dim); line-height:1.6; margin-top:22px; }
+  a { color:var(--teal); }
+</style>
+</head>
+<body>
+  <h1>Premier League — modelled title, top-4 &amp; relegation odds</h1>
+  <p class="updated">Last updated 2026-09-22 08:58 UTC. Model: real historical points &amp; goal-difference gaps, 46,273 observations. Source: England, full top-flight history (1888–2024), seanelvidge/England-football-results.</p>
+  <table>
+    <thead><tr><th>#</th><th>Team</th><th>Pld</th><th>GD</th><th>Pts</th><th>Title</th><th>Top&nbsp;4</th><th>Releg.</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Man City</td><td>5</td><td>+8</td><td>15</td><td class="title">18.0%</td><td>76.6%</td><td class="releg">0.6%</td></tr>
+      <tr><td>2</td><td>Arsenal</td><td>5</td><td>+4</td><td>12</td><td class="title">8.3%</td><td>50.1%</td><td class="releg">1.9%</td></tr>
+      <tr><td>3</td><td>Brighton Hove</td><td>5</td><td>+11</td><td>10</td><td class="title">15.1%</td><td>51.1%</td><td class="releg">1.9%</td></tr>
+      <tr><td>4</td><td>Brentford</td><td>5</td><td>+6</td><td>9</td><td class="title">7.6%</td><td>34.0%</td><td class="releg">3.7%</td></tr>
+      <tr><td>5</td><td>Leeds United</td><td>5</td><td>+4</td><td>9</td><td class="title">6.0%</td><td>30.2%</td><td class="releg">4.3%</td></tr>
+      <tr><td>6</td><td>Liverpool</td><td>5</td><td>+3</td><td>9</td><td class="title">5.3%</td><td>28.4%</td><td class="releg">4.6%</td></tr>
+      <tr><td>7</td><td>Everton</td><td>5</td><td>+3</td><td>9</td><td class="title">5.3%</td><td>28.4%</td><td class="releg">4.6%</td></tr>
+      <tr><td>8</td><td>Hull City</td><td>5</td><td>+2</td><td>8</td><td class="title">4.2%</td><td>21.6%</td><td class="releg">6.4%</td></tr>
+      <tr><td>9</td><td>Newcastle</td><td>5</td><td>+0</td><td>8</td><td class="title">3.2%</td><td>18.8%</td><td class="releg">7.3%</td></tr>
+      <tr><td>10</td><td>Chelsea</td><td>5</td><td>-2</td><td>7</td><td class="title">2.2%</td><td>12.9%</td><td class="releg">10.8%</td></tr>
+      <tr><td>11</td><td>Ipswich Town</td><td>5</td><td>-4</td><td>6</td><td class="title">1.5%</td><td>8.6%</td><td class="releg">15.7%</td></tr>
+      <tr><td>12</td><td>Man United</td><td>5</td><td>+0</td><td>5</td><td class="title">2.3%</td><td>9.1%</td><td class="releg">15.2%</td></tr>
+      <tr><td>13</td><td>Nottingham</td><td>5</td><td>-1</td><td>5</td><td class="title">2.0%</td><td>8.4%</td><td class="releg">16.2%</td></tr>
+      <tr><td>14</td><td>Sunderland</td><td>5</td><td>-4</td><td>4</td><td class="title">1.2%</td><td>5.1%</td><td class="releg">24.3%</td></tr>
+      <tr><td>15</td><td>Crystal Palace</td><td>5</td><td>-5</td><td>4</td><td class="title">1.1%</td><td>4.7%</td><td class="releg">25.7%</td></tr>
+      <tr><td>16</td><td>Aston Villa</td><td>5</td><td>-5</td><td>4</td><td class="title">1.1%</td><td>4.7%</td><td class="releg">25.7%</td></tr>
+      <tr><td>17</td><td>Bournemouth</td><td>5</td><td>-2</td><td>3</td><td class="title">1.4%</td><td>4.6%</td><td class="releg">26.5%</td></tr>
+      <tr><td>18</td><td>Coventry City</td><td>5</td><td>-9</td><td>3</td><td class="title">0.6%</td><td>2.6%</td><td class="releg">38.1%</td></tr>
+      <tr><td>19</td><td>Fulham</td><td>5</td><td>-3</td><td>2</td><td class="title">1.1%</td><td>3.2%</td><td class="releg">33.9%</td></tr>
+      <tr><td>20</td><td>Tottenham</td><td>5</td><td>-6</td><td>2</td><td class="title">0.7%</td><td>2.5%</td><td class="releg">39.2%</td></tr>
+    </tbody>
+  </table>
+  <p class="note">
+    Assumes a standard bottom-3 relegation zone. Percentages are a historical-comparison model, not a live bookmaker forecast — see the
+    <a href="index.html">interactive version</a> for the full methodology, uncertainty ranges, and other data-source options.
+    Regenerated automatically on a schedule via GitHub Actions.
+  </p>
+</body>
+</html>
