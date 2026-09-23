@@ -149,8 +149,10 @@ def make_prev_norm_lookup(seasons_sorted, final_rank_by_season, n_teams_by_seaso
 
 # ---------- Step 2: build row-level training observations ----------
 
+MAX_K = 19  # covers every possible finishing position below 1st for a 20-team league
+
 def build_training_rows(seasons_sorted, season_rows, final_rank_by_season, n_teams_by_season, prev_norm_rank):
-    rows_by_scenario = {k: [] for k in SCENARIOS}
+    rows_by_K = {k: [] for k in range(1, MAX_K + 1)}
     for season_idx, season in enumerate(seasons_sorted):
         rows = season_rows[season]
         win_pts = 3 if start_year(season) >= 1981 else 2
@@ -179,9 +181,8 @@ def build_training_rows(seasons_sorted, season_rows, final_rank_by_season, n_tea
                 continue
             ranked = sorted(teams_active, key=lambda t: (-points[t], -gd[t]))
 
-            for scen, kfn in SCENARIOS.items():
-                K = kfn(N)
-                if K is None or K < 1 or K > len(ranked):
+            for K in range(1, min(MAX_K, N - 1) + 1):
+                if K > len(ranked):
                     continue
                 boundary = ranked[K - 1]
                 b_pts, b_gd, b_played = points[boundary], gd[boundary], played[boundary]
@@ -193,8 +194,8 @@ def build_training_rows(seasons_sorted, season_rows, final_rank_by_season, n_tea
                     cand_prev = prev_norm[cand]
                     games_diff = max(-6, min(6, b_played - played[cand]))  # + = candidate has games in hand
                     outcome = 1 if final_rank[cand] <= K else 0
-                    rows_by_scenario[scen].append((pgap, ggap, cand_prev, games_diff, week_frac, outcome))
-    return rows_by_scenario
+                    rows_by_K[K].append((pgap, ggap, cand_prev, games_diff, week_frac, outcome))
+    return rows_by_K
 
 
 def sigmoid(z):
@@ -287,29 +288,46 @@ def attach_previous_season(table, seasons_sorted, season_rows, final_rank_by_sea
 
 # ---------- Step 5: compute predictions and render the page ----------
 
-def compute_predictions(table, models, season_len=38):
-    leader = table[0]
-    fourth = table[3]
-    safety = table[16]  # 17th place = last safe spot, assuming a standard 3-team drop zone
+def compute_predictions(table, models_by_K, season_len=38, conf=0.80):
+    N = len(table)
 
     results = []
     for team in table:
         games_left = max(0, season_len - team["played"])
         week_frac = min(1.0, team["played"] / season_len)
 
-        gih_leader = leader["played"] - team["played"]    # + = team has games in hand on the leader
-        gih_fourth = fourth["played"] - team["played"]
-        gih_safety = safety["played"] - team["played"]
+        # Build the full CDF over final position: cdf[K] = P(finish at or above K).
+        # Each K uses its own independently-fitted model and its own real boundary
+        # team (whoever actually sits at position K in the live table right now).
+        cdf = [0.0] * (N + 1)
+        for K in range(1, N):
+            if K > MAX_K:
+                cdf[K] = cdf[K - 1]  # no model beyond MAX_K; carry forward rather than guess
+                continue
+            boundary = table[K - 1]
+            gih = boundary["played"] - team["played"]
+            p = predict(models_by_K[K], team["points"] - boundary["points"], team["gd"] - boundary["gd"],
+                        team["prev_norm"], gih, week_frac, games_left)
+            cdf[K] = p
+        cdf[N] = 1.0
+        # Independently-fit models can occasionally produce a tiny non-monotonic
+        # step (P(<=5th) coming out below P(<=4th), which can't really happen) -
+        # enforce it rather than trust every model in isolation.
+        for K in range(1, N + 1):
+            cdf[K] = max(cdf[K], cdf[K - 1])
 
-        p_title = predict(models["title"], team["points"] - leader["points"], team["gd"] - leader["gd"],
-                           team["prev_norm"], gih_leader, week_frac, games_left)
-        p_top4 = predict(models["top4"], team["points"] - fourth["points"], team["gd"] - fourth["gd"],
-                          team["prev_norm"], gih_fourth, week_frac, games_left)
-        p_safe = predict(models["releg"], team["points"] - safety["points"], team["gd"] - safety["gd"],
-                          team["prev_norm"], gih_safety, week_frac, games_left)
+        title_pct = cdf[1] * 100
+        top4_pct = cdf[4] * 100 if N >= 4 else cdf[N] * 100
+        safety_K = N - 3 if N >= 5 else N
+        releg_pct = (1 - cdf[safety_K]) * 100
 
-        results.append({**team, "title_pct": p_title * 100, "top4_pct": p_top4 * 100,
-                         "releg_pct": (1 - p_safe) * 100})
+        lo_target, hi_target = (1 - conf) / 2, 1 - (1 - conf) / 2
+        median = next(K for K in range(1, N + 1) if cdf[K] >= 0.5)
+        range_lo = next(K for K in range(1, N + 1) if cdf[K] >= lo_target)
+        range_hi = next(K for K in range(1, N + 1) if cdf[K] >= hi_target)
+
+        results.append({**team, "title_pct": title_pct, "top4_pct": top4_pct, "releg_pct": releg_pct,
+                         "median_pos": median, "range_lo": range_lo, "range_hi": range_hi})
     return results
 
 
@@ -346,7 +364,7 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
   <h1>Premier League — modelled title, top-4 &amp; relegation odds</h1>
   <p class="updated">Last updated {updated} UTC. Model: points, goal difference, previous-season finishing position &amp; games in hand, {n_obs:,} historical observations. Source: {source_label}.</p>
   <table>
-    <thead><tr><th>#</th><th>Team</th><th>Pld</th><th>GD</th><th>Pts</th><th>Title</th><th>Top&nbsp;4</th><th>Releg.</th></tr></thead>
+    <thead><tr><th>#</th><th>Team</th><th>Pld</th><th>GD</th><th>Pts</th><th>Title</th><th>Top&nbsp;4</th><th>Releg.</th><th>Median</th><th>80%&nbsp;range</th></tr></thead>
     <tbody>
 {rows}
     </tbody>
@@ -355,13 +373,23 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
     Assumes a standard bottom-3 relegation zone. "Previous season" means each team's actual finishing position last time they were in the top flight;
     newly promoted or unrecognised teams are treated as if they finished below the bottom of the previous table. Percentages are a historical-comparison
     model, not a live bookmaker forecast — see the <a href="index.html">interactive version</a> for the full methodology and uncertainty ranges.
+  </p>
+  <p class="note">
+    "Median" and "80% range" come from stitching together 19 separately-fitted models (one per possible finishing position) into a single probability
+    curve over final position, then reading off the middle 80% of it. Unlike the title/top-4/relegation percentages, this hasn't been through the same
+    held-out historical validation — treat it as a genuine extrapolation of the same method, not an equally-tested one. Positions with no real competitive
+    stakes attached (mid-table finishes nobody is actually chasing) have thinner, noisier historical support than the title, Europe, or relegation cutoffs do.
+  </p>
+  <p class="note">
     Regenerated automatically on a schedule via GitHub Actions.
   </p>
 </body>
 </html>
 """
 
-ROW_TEMPLATE = "      <tr><td>{position}</td><td>{name}</td><td>{played}</td><td>{gd:+d}</td><td>{points}</td><td class=\"title\">{title_pct:.1f}%</td><td>{top4_pct:.1f}%</td><td class=\"releg\">{releg_pct:.1f}%</td></tr>"
+ROW_TEMPLATE = ("      <tr><td>{position}</td><td>{name}</td><td>{played}</td><td>{gd:+d}</td><td>{points}</td>"
+                 "<td class=\"title\">{title_pct:.1f}%</td><td>{top4_pct:.1f}%</td><td class=\"releg\">{releg_pct:.1f}%</td>"
+                 "<td>{median_pos}</td><td>{range_lo}\u2013{range_hi}</td></tr>")
 
 
 def render_page(results, n_obs, source_label):
@@ -388,18 +416,18 @@ def main():
             seasons_sorted, season_rows
         )
         prev_norm_rank = make_prev_norm_lookup(seasons_sorted, final_rank_by_season, n_teams_by_season)
-        rows_by_scenario = build_training_rows(
+        rows_by_K = build_training_rows(
             seasons_sorted, season_rows, final_rank_by_season, n_teams_by_season, prev_norm_rank
         )
-        models = {scen: fit_logreg(rows_by_scenario[scen]) for scen in SCENARIOS}
-        n_obs = len(rows_by_scenario["title"])
+        models_by_K = {K: fit_logreg(rows_by_K[K]) for K in rows_by_K}
+        n_obs = len(rows_by_K[1])
 
         table = fetch_live_table(token)
         table = attach_previous_season(
             table, seasons_sorted, season_rows, final_rank_by_season, n_teams_by_season, match_count_by_season
         )
 
-    results = compute_predictions(table, models)
+    results = compute_predictions(table, models_by_K)
     html = render_page(
         results, n_obs,
         source_label="England, full top-flight history (1888–2024), seanelvidge/England-football-results",
