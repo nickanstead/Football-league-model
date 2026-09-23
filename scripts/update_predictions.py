@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """
-Rebuilds the points/goal-difference logistic regression model from real historical
-top-flight results (footballcsv/cache.footballdata), fetches the current Premier
-League table from football-data.org, and writes live-table.html with each club's
+Rebuilds the points / goal-difference / previous-season-position logistic
+regression model from real historical English top-flight results
+(seanelvidge/England-football-results), fetches the current Premier League
+table from football-data.org, and writes live-table.html with each club's
 modelled chance of winning the league, finishing top 4, and being relegated.
 
 Run by .github/workflows/update-predictions.yml on a schedule.
 Requires env var FOOTBALL_DATA_TOKEN (a free key from football-data.org).
 """
-import csv, glob, re, json, math, os, subprocess, sys, tempfile
+import csv, re, json, math, os, subprocess, sys, tempfile
 from datetime import datetime, timezone
 from collections import defaultdict
 import urllib.request
+import numpy as np
 
 SCENARIOS = {
     "title": lambda n: 1,
@@ -19,85 +21,56 @@ SCENARIOS = {
     "releg": lambda n: (n - 3) if n >= 5 else None,
 }
 
-# ---------- Step 1: rebuild the historical model from footballcsv/cache.footballdata ----------
+PLACEHOLDER_NORM = 1.15  # "worse than bottom of the table" - used for promoted/unmatched teams
 
-def process_season(rows, win_pts, bins_out):
-    total_matches = len(rows)
-    if total_matches < 40:
-        return
-    final_points = defaultdict(int)
-    final_gd = defaultdict(int)
-    for (d, t1, t2, g1, g2) in rows:
-        if g1 > g2: final_points[t1] += win_pts
-        elif g2 > g1: final_points[t2] += win_pts
-        else:
-            final_points[t1] += 1; final_points[t2] += 1
-        final_gd[t1] += g1 - g2
-        final_gd[t2] += g2 - g1
-
-    N = len(final_points)
-    if N < 6:
-        return
-    final_order = sorted(final_points.keys(), key=lambda t: (-final_points[t], -final_gd[t]))
-    final_rank = {t: i + 1 for i, t in enumerate(final_order)}
-
-    points = defaultdict(int)
-    gd = defaultdict(int)
-    played = defaultdict(int)
-    snapshot_every = max(1, total_matches // 20)
-
-    for idx, (d, t1, t2, g1, g2) in enumerate(rows):
-        if g1 > g2: points[t1] += win_pts
-        elif g2 > g1: points[t2] += win_pts
-        else:
-            points[t1] += 1; points[t2] += 1
-        gd[t1] += g1 - g2
-        gd[t2] += g2 - g1
-        played[t1] += 1; played[t2] += 1
-
-        if idx % snapshot_every != 0:
-            continue
-        week_frac = (idx + 1) / total_matches
-        decile = min(9, int(week_frac * 10))
-
-        teams_active = [t for t in points if played[t] >= 3]
-        if len(teams_active) < 6:
-            continue
-        ranked = sorted(teams_active, key=lambda t: (-points[t], -gd[t]))
-
-        for scen, kfn in SCENARIOS.items():
-            K = kfn(N)
-            if K is None or K < 1 or K > len(ranked):
-                continue
-            boundary_team = ranked[K - 1]
-            boundary_pts = points[boundary_team]
-            boundary_gd = gd[boundary_team]
-            for cand in ranked:
-                if cand == boundary_team:
-                    continue
-                raw_pgap = points[cand] - boundary_pts
-                pgap = max(-20, min(20, int(round(raw_pgap / 2.0)) * 2))
-                raw_ggap = gd[cand] - boundary_gd
-                ggap = max(-20, min(20, int(round(raw_ggap / 4.0)) * 4))
-                good = 1 if final_rank[cand] <= K else 0
-                key = (pgap, ggap, decile)
-                bins_out[scen][key][0] += good
-                bins_out[scen][key][1] += 1
+# A team currently in the Premier League can be named differently by the live API
+# (e.g. "Man City") than by the historical archive (e.g. "Manchester City"). This
+# covers every club that has appeared in the Premier League plus recent
+# Championship arrivals; anything not listed here safely falls back to the
+# promoted-team placeholder rather than crashing or silently mismatching.
+NAME_ALIASES = {
+    "arsenal": "Arsenal", "aston villa": "Aston Villa", "bournemouth": "AFC Bournemouth",
+    "afc bournemouth": "AFC Bournemouth", "brentford": "Brentford",
+    "brighton": "Brighton & Hove Albion", "brighton hove albion": "Brighton & Hove Albion",
+    "brighton and hove albion": "Brighton & Hove Albion", "burnley": "Burnley",
+    "chelsea": "Chelsea", "crystal palace": "Crystal Palace", "everton": "Everton",
+    "fulham": "Fulham", "leeds": "Leeds United", "leeds united": "Leeds United",
+    "leicester": "Leicester City", "leicester city": "Leicester City",
+    "liverpool": "Liverpool", "man city": "Manchester City", "manchester city": "Manchester City",
+    "man united": "Manchester United", "man utd": "Manchester United",
+    "manchester united": "Manchester United", "newcastle": "Newcastle United",
+    "newcastle united": "Newcastle United", "nottingham forest": "Nottingham Forest",
+    "nottm forest": "Nottingham Forest", "norwich": "Norwich City", "norwich city": "Norwich City",
+    "southampton": "Southampton", "sunderland": "Sunderland",
+    "tottenham": "Tottenham Hotspur", "tottenham hotspur": "Tottenham Hotspur",
+    "spurs": "Tottenham Hotspur", "watford": "Watford", "west brom": "West Bromwich Albion",
+    "west bromwich albion": "West Bromwich Albion", "west ham": "West Ham United",
+    "west ham united": "West Ham United", "wolves": "Wolverhampton Wanderers",
+    "wolverhampton wanderers": "Wolverhampton Wanderers", "ipswich": "Ipswich Town",
+    "ipswich town": "Ipswich Town", "luton": "Luton Town", "luton town": "Luton Town",
+    "sheffield united": "Sheffield United", "sheffield utd": "Sheffield United",
+    "hull": "Hull City", "hull city": "Hull City", "coventry": "Coventry City",
+    "coventry city": "Coventry City",
+}
 
 
-def parse_score_ft(ft):
-    m = re.match(r"^\s*(\d+)\s*-\s*(\d+)\s*$", ft or "")
-    if not m: return None
-    return int(m.group(1)), int(m.group(2))
+def normalize_team_name(name):
+    return re.sub(r"[^a-z0-9 ]", "", name.lower()).strip()
 
 
-def parse_date_dow(s):
-    try: return datetime.strptime(s.strip(), "%a %b %d %Y")
-    except Exception: return None
+def match_archive_name(live_name):
+    key = normalize_team_name(live_name)
+    return NAME_ALIASES.get(key)
 
 
-def build_england_source_bins(repo_dir):
-    bins_out = {k: defaultdict(lambda: [0, 0]) for k in SCENARIOS}
+# ---------- Step 1: load the England archive and compute final standings per season ----------
+
+def start_year(season):
+    m = re.match(r"(\d{4})", season)
+    return int(m.group(1)) if m else None
+
+
+def load_seasons(repo_dir):
     by_season = defaultdict(list)
     csv_path = os.path.join(repo_dir, "EnglandLeagueResults.csv")
     with open(csv_path, newline='', encoding='utf-8', errors='replace') as f:
@@ -117,46 +90,139 @@ def build_england_source_bins(repo_dir):
             season = r["Season"].strip()
             by_season[season].append((d, t1, t2, g1, g2))
 
-    seasons_used = 0
+    season_rows = {}
     for season, rows in by_season.items():
+        # A season only enters training (or counts as anyone's "previous season") once
+        # it's actually finished - checked relative to how many matches a complete
+        # double round-robin needs for however many teams played that season, since a
+        # genuinely complete season had far fewer teams (and matches) a century ago
+        # than it does now. Without this, a currently in-progress season gets treated
+        # as if its partial table were the real final one.
+        teams = set()
+        for (d, t1, t2, g1, g2) in rows:
+            teams.add(t1); teams.add(t2)
+        n_teams = len(teams)
+        expected_matches = n_teams * (n_teams - 1)
+        if n_teams < 6 or len(rows) < expected_matches * 0.95:
+            continue
         rows.sort(key=lambda x: x[0])
-        m = re.match(r"(\d{4})", season)
-        start_year = int(m.group(1)) if m else 2000
-        # English football moved from 2 points for a win to 3 points from the 1981-82 season.
-        win_pts = 3 if start_year >= 1981 else 2
-        process_season(rows, win_pts, bins_out)
-        seasons_used += 1
-    print(f"Processed {seasons_used} England top-flight seasons (1888-present)", file=sys.stderr)
-    return bins_out
+        season_rows[season] = rows
+
+    seasons_sorted = sorted(season_rows.keys(), key=start_year)
+    return seasons_sorted, season_rows
+
+
+def compute_final_standings(seasons_sorted, season_rows):
+    final_rank_by_season = {}
+    n_teams_by_season = {}
+    match_count_by_season = {}
+    for season in seasons_sorted:
+        rows = season_rows[season]
+        win_pts = 3 if start_year(season) >= 1981 else 2
+        pts = defaultdict(int); gd = defaultdict(int)
+        for (d, t1, t2, g1, g2) in rows:
+            if g1 > g2: pts[t1] += win_pts
+            elif g2 > g1: pts[t2] += win_pts
+            else: pts[t1] += 1; pts[t2] += 1
+            gd[t1] += g1 - g2; gd[t2] += g2 - g1
+        order = sorted(pts.keys(), key=lambda t: (-pts[t], -gd[t]))
+        final_rank_by_season[season] = {t: i + 1 for i, t in enumerate(order)}
+        n_teams_by_season[season] = len(order)
+        match_count_by_season[season] = len(rows)
+    return final_rank_by_season, n_teams_by_season, match_count_by_season
+
+
+def make_prev_norm_lookup(seasons_sorted, final_rank_by_season, n_teams_by_season):
+    def prev_norm_rank(season_idx, team):
+        if season_idx == 0:
+            return PLACEHOLDER_NORM
+        prev_season = seasons_sorted[season_idx - 1]
+        if start_year(seasons_sorted[season_idx]) - start_year(prev_season) != 1:
+            return PLACEHOLDER_NORM
+        prev_ranks = final_rank_by_season[prev_season]
+        n_prev = n_teams_by_season[prev_season]
+        if team not in prev_ranks:
+            return PLACEHOLDER_NORM
+        return (prev_ranks[team] - 1) / max(1, (n_prev - 1))
+    return prev_norm_rank
+
+
+# ---------- Step 2: build row-level training observations ----------
+
+def build_training_rows(seasons_sorted, season_rows, final_rank_by_season, n_teams_by_season, prev_norm_rank):
+    rows_by_scenario = {k: [] for k in SCENARIOS}
+    for season_idx, season in enumerate(seasons_sorted):
+        rows = season_rows[season]
+        win_pts = 3 if start_year(season) >= 1981 else 2
+        total_matches = len(rows)
+        N = n_teams_by_season[season]
+        if N < 6:
+            continue
+        final_rank = final_rank_by_season[season]
+
+        points = defaultdict(int); gd = defaultdict(int); played = defaultdict(int)
+        snapshot_every = max(1, total_matches // 20)
+        prev_norm = {t: prev_norm_rank(season_idx, t) for t in final_rank}
+
+        for idx, (d, t1, t2, g1, g2) in enumerate(rows):
+            if g1 > g2: points[t1] += win_pts
+            elif g2 > g1: points[t2] += win_pts
+            else: points[t1] += 1; points[t2] += 1
+            gd[t1] += g1 - g2; gd[t2] += g2 - g1
+            played[t1] += 1; played[t2] += 1
+
+            if idx % snapshot_every != 0:
+                continue
+            week_frac = (idx + 1) / total_matches
+            teams_active = [t for t in points if played[t] >= 3]
+            if len(teams_active) < 6:
+                continue
+            ranked = sorted(teams_active, key=lambda t: (-points[t], -gd[t]))
+
+            for scen, kfn in SCENARIOS.items():
+                K = kfn(N)
+                if K is None or K < 1 or K > len(ranked):
+                    continue
+                boundary = ranked[K - 1]
+                b_pts, b_gd, b_played = points[boundary], gd[boundary], played[boundary]
+                for cand in ranked:
+                    if cand == boundary:
+                        continue
+                    pgap = max(-20, min(20, points[cand] - b_pts))
+                    ggap = max(-20, min(20, gd[cand] - b_gd))
+                    cand_prev = prev_norm[cand]
+                    games_diff = max(-6, min(6, b_played - played[cand]))  # + = candidate has games in hand
+                    outcome = 1 if final_rank[cand] <= K else 0
+                    rows_by_scenario[scen].append((pgap, ggap, cand_prev, games_diff, week_frac, outcome))
+    return rows_by_scenario
 
 
 def sigmoid(z):
-    if z < -35: return 0.0
-    if z > 35: return 1.0
-    return 1 / (1 + math.exp(-z))
+    return 1 / (1 + np.exp(-np.clip(z, -35, 35)))
 
 
-def fit_model(bins):
-    b = [0.0] * 6
-    lr = 0.5
-    n_total = sum(v[1] for v in bins.values()) or 1
-    rows = [(pg, gg, d, good, tot) for (pg, gg, d), (good, tot) in bins.items()]
-    for _ in range(2200):
-        grad = [0.0] * 6
-        for pgap, ggap, decile, good, tot in rows:
-            pg = pgap / 20.0; gg = ggap / 20.0; wf = (decile + 0.5) / 10.0
-            x = [1.0, pg, wf, pg * wf, gg, gg * wf]
-            z = sum(b[k] * x[k] for k in range(6))
-            pred = sigmoid(z)
-            err = pred * tot - good
-            for k in range(6): grad[k] += err * x[k]
-        for k in range(6): b[k] -= lr * grad[k] / n_total
+def make_features(pgap, ggap, cand_prev, games_diff, wf):
+    pg = pgap / 20.0; gg = ggap / 20.0; gih = games_diff / 6.0
+    return np.column_stack([np.ones_like(pg), pg, wf, pg * wf, gg, gg * wf, cand_prev, cand_prev * wf, gih, gih * wf])
+
+
+def fit_logreg(rows, epochs=3000, lr=0.3):
+    arr = np.array(rows)
+    X = make_features(arr[:, 0], arr[:, 1], arr[:, 2], arr[:, 3], arr[:, 4])
+    y = arr[:, 5]
+    b = np.zeros(X.shape[1])
+    for _ in range(epochs):
+        p = sigmoid(X @ b)
+        grad = X.T @ (p - y) / len(y)
+        b -= lr * grad
     return b
 
 
-def predict(b, pgap, ggap, wf, games_left):
+def predict(b, pgap, ggap, cand_prev, games_diff, wf, games_left):
     # Hard mathematical ceiling based on points alone: a gap bigger than 3x games
-    # remaining cannot be closed, whatever goal difference says.
+    # remaining cannot be closed, whatever goal difference or history says. Note
+    # games_left here should already include any games in hand (see call site) -
+    # that's exactly how a game in hand can turn "impossible" into "still alive".
     if games_left <= 0:
         if pgap > 0: return 1.0
         if pgap < 0: return 0.0
@@ -164,12 +230,12 @@ def predict(b, pgap, ggap, wf, games_left):
     max_swing = 3 * games_left
     if abs(pgap) > max_swing:
         return 1.0 if pgap > 0 else 0.0
-    pg = pgap / 20.0; gg = ggap / 20.0
-    z = b[0] + b[1] * pg + b[2] * wf + b[3] * pg * wf + b[4] * gg + b[5] * gg * wf
-    return sigmoid(z)
+    x = np.array([1.0, pgap / 20.0, wf, (pgap / 20.0) * wf, ggap / 20.0, (ggap / 20.0) * wf,
+                  cand_prev, cand_prev * wf, games_diff / 6.0, (games_diff / 6.0) * wf])
+    return float(sigmoid(x @ b))
 
 
-# ---------- Step 2: fetch the live Premier League table ----------
+# ---------- Step 3: fetch the live Premier League table ----------
 
 def fetch_live_table(token):
     req = urllib.request.Request(
@@ -191,7 +257,35 @@ def fetch_live_table(token):
     return sorted(table, key=lambda r: r["position"])
 
 
-# ---------- Step 3: compute predictions and render the page ----------
+# ---------- Step 4: attach each live team's previous-season position ----------
+
+def attach_previous_season(table, seasons_sorted, season_rows, final_rank_by_season, n_teams_by_season, match_count_by_season):
+    # seasons_sorted now only contains genuinely complete seasons (see load_seasons),
+    # so the most recent entry is always a real finished season - never the one
+    # currently in progress.
+    if not seasons_sorted:
+        for t in table:
+            t["prev_norm"] = PLACEHOLDER_NORM
+        return table
+    prev_season = seasons_sorted[-1]
+    prev_ranks = final_rank_by_season[prev_season]
+    n_prev = n_teams_by_season[prev_season]
+    print(f"Using {prev_season} as the previous season for position lookups", file=sys.stderr)
+
+    unmatched = []
+    for t in table:
+        archive_name = match_archive_name(t["name"])
+        if archive_name and archive_name in prev_ranks:
+            t["prev_norm"] = (prev_ranks[archive_name] - 1) / max(1, (n_prev - 1))
+        else:
+            t["prev_norm"] = PLACEHOLDER_NORM
+            unmatched.append(t["name"])
+    if unmatched:
+        print(f"No previous-season match for: {', '.join(unmatched)} (treated as promoted)", file=sys.stderr)
+    return table
+
+
+# ---------- Step 5: compute predictions and render the page ----------
 
 def compute_predictions(table, models, season_len=38):
     leader = table[0]
@@ -203,12 +297,16 @@ def compute_predictions(table, models, season_len=38):
         games_left = max(0, season_len - team["played"])
         week_frac = min(1.0, team["played"] / season_len)
 
-        p_title = predict(models["title"], team["points"] - leader["points"],
-                           team["gd"] - leader["gd"], week_frac, games_left)
-        p_top4 = predict(models["top4"], team["points"] - fourth["points"],
-                          team["gd"] - fourth["gd"], week_frac, games_left)
-        p_safe = predict(models["releg"], team["points"] - safety["points"],
-                          team["gd"] - safety["gd"], week_frac, games_left)
+        gih_leader = leader["played"] - team["played"]    # + = team has games in hand on the leader
+        gih_fourth = fourth["played"] - team["played"]
+        gih_safety = safety["played"] - team["played"]
+
+        p_title = predict(models["title"], team["points"] - leader["points"], team["gd"] - leader["gd"],
+                           team["prev_norm"], gih_leader, week_frac, games_left)
+        p_top4 = predict(models["top4"], team["points"] - fourth["points"], team["gd"] - fourth["gd"],
+                          team["prev_norm"], gih_fourth, week_frac, games_left)
+        p_safe = predict(models["releg"], team["points"] - safety["points"], team["gd"] - safety["gd"],
+                          team["prev_norm"], gih_safety, week_frac, games_left)
 
         results.append({**team, "title_pct": p_title * 100, "top4_pct": p_top4 * 100,
                          "releg_pct": (1 - p_safe) * 100})
@@ -233,7 +331,7 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
   html,body {{ margin:0; background:var(--bg); color:var(--text); }}
   body {{ padding:24px 16px 40px; max-width:720px; margin:0 auto; }}
   h1 {{ font-size:24px; margin:0 0 4px; }}
-  .updated {{ font-size:12.5px; color:var(--text-dim); margin:0 0 20px; }}
+  .updated {{ font-size:12.5px; color:var(--text-dim); margin:0 0 20px; line-height:1.5; }}
   table {{ width:100%; border-collapse:collapse; font-size:14px; }}
   th,td {{ padding:9px 6px; text-align:right; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums; }}
   th:nth-child(2), td:nth-child(2) {{ text-align:left; }}
@@ -246,7 +344,7 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body>
   <h1>Premier League — modelled title, top-4 &amp; relegation odds</h1>
-  <p class="updated">Last updated {updated} UTC. Model: real historical points &amp; goal-difference gaps, {n_obs:,} observations. Source: {source_label}.</p>
+  <p class="updated">Last updated {updated} UTC. Model: points, goal difference, previous-season finishing position &amp; games in hand, {n_obs:,} historical observations. Source: {source_label}.</p>
   <table>
     <thead><tr><th>#</th><th>Team</th><th>Pld</th><th>GD</th><th>Pts</th><th>Title</th><th>Top&nbsp;4</th><th>Releg.</th></tr></thead>
     <tbody>
@@ -254,8 +352,9 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
     </tbody>
   </table>
   <p class="note">
-    Assumes a standard bottom-3 relegation zone. Percentages are a historical-comparison model, not a live bookmaker forecast — see the
-    <a href="index.html">interactive version</a> for the full methodology, uncertainty ranges, and other data-source options.
+    Assumes a standard bottom-3 relegation zone. "Previous season" means each team's actual finishing position last time they were in the top flight;
+    newly promoted or unrecognised teams are treated as if they finished below the bottom of the previous table. Percentages are a historical-comparison
+    model, not a live bookmaker forecast — see the <a href="index.html">interactive version</a> for the full methodology and uncertainty ranges.
     Regenerated automatically on a schedule via GitHub Actions.
   </p>
 </body>
@@ -284,14 +383,27 @@ def main():
              "https://github.com/seanelvidge/England-football-results.git", repo_dir],
             check=True,
         )
-        bins = build_england_source_bins(repo_dir)
+        seasons_sorted, season_rows = load_seasons(repo_dir)
+        final_rank_by_season, n_teams_by_season, match_count_by_season = compute_final_standings(
+            seasons_sorted, season_rows
+        )
+        prev_norm_rank = make_prev_norm_lookup(seasons_sorted, final_rank_by_season, n_teams_by_season)
+        rows_by_scenario = build_training_rows(
+            seasons_sorted, season_rows, final_rank_by_season, n_teams_by_season, prev_norm_rank
+        )
+        models = {scen: fit_logreg(rows_by_scenario[scen]) for scen in SCENARIOS}
+        n_obs = len(rows_by_scenario["title"])
 
-    n_obs = sum(v[1] for v in bins["title"].values())
-    models = {scen: fit_model(bins[scen]) for scen in SCENARIOS}
+        table = fetch_live_table(token)
+        table = attach_previous_season(
+            table, seasons_sorted, season_rows, final_rank_by_season, n_teams_by_season, match_count_by_season
+        )
 
-    table = fetch_live_table(token)
     results = compute_predictions(table, models)
-    html = render_page(results, n_obs, source_label="England, full top-flight history (1888–2024), seanelvidge/England-football-results")
+    html = render_page(
+        results, n_obs,
+        source_label="England, full top-flight history (1888–2024), seanelvidge/England-football-results",
+    )
 
     with open("live-table.html", "w", encoding="utf-8") as f:
         f.write(html)
