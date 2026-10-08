@@ -25,40 +25,88 @@
   td.releg { color:var(--red); font-weight:600; }
   .note { font-size:12.5px; color:var(--text-dim); line-height:1.6; margin-top:22px; }
   a { color:var(--teal); }
+  tbody tr { cursor:pointer; }
+  tbody tr:active, tbody tr.open { background:var(--surface-2); }
+  #trajectory { display:none; margin-top:18px; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  #trajectory.visible { display:block; }
+  #trajectory h2 { font-size:15px; margin:0 0 2px; }
+  #trajectory .sub { font-size:12px; color:var(--text-dim); margin:0 0 12px; }
+  #trajectory .legend { display:flex; gap:14px; font-size:11.5px; color:var(--text-dim); margin-top:8px; flex-wrap:wrap; }
+  #trajectory .legend span { display:flex; align-items:center; gap:5px; }
+  #trajectory .swatch { width:9px; height:9px; border-radius:2px; display:inline-block; }
+  #trajectory .chart-wrap { position:relative; width:100%; height:220px; }
+  #trajectory .close-btn { float:right; background:none; border:none; color:var(--text-dim); font-size:13px; cursor:pointer; padding:2px 6px; }
+  #highlights { margin-top:20px; padding:14px 16px; background:var(--surface); border-left:4px solid var(--amber); border-radius:6px; }
+  #highlights strong { display:block; font-size:14.5px; color:var(--text); margin-bottom:8px; }
+  #highlights ul { margin:0; padding-left:18px; }
+  #highlights li { font-size:14.5px; font-weight:600; line-height:1.55; margin-bottom:6px; color:var(--text); }
+  #highlights li em { font-style:normal; color:var(--amber); }
+  #highlights .sub { margin-top:10px; font-size:11px; font-weight:400; color:var(--text-dim); }
 </style>
 </head>
 <body>
   <h1>Premier League — modelled title, top-4 &amp; relegation odds</h1>
-  <p class="updated">Last updated 2026-10-08 00:09 UTC. Model: points, goal difference, previous-season finishing position &amp; games in hand, 46,054 historical observations. Source: England, full top-flight history (1888–2024), seanelvidge/England-football-results.</p>
+  <p class="updated">Last updated 2026-10-08 09:18 UTC. Model: points, goal difference, previous-season finishing position &amp; games in hand, 46,054 historical observations. Source: England, full top-flight history (1888–2024), seanelvidge/England-football-results.</p>
   <table>
     <thead><tr><th>#</th><th>Team</th><th>Pld</th><th>GD</th><th>Pts</th><th>Title</th><th>Top&nbsp;4</th><th>Releg.</th><th>Median</th><th>80%&nbsp;range</th></tr></thead>
     <tbody>
-      <tr><td>1</td><td>Man City</td><td>5</td><td>+8</td><td>15</td><td class="title">25.9%</td><td>84.8%</td><td class="releg">0.6%</td><td>2</td><td>1–7</td></tr>
-      <tr><td>2</td><td>Arsenal</td><td>5</td><td>+4</td><td>12</td><td class="title">14.8%</td><td>66.2%</td><td class="releg">1.7%</td><td>4</td><td>1–10</td></tr>
-      <tr><td>3</td><td>Brighton Hove</td><td>5</td><td>+11</td><td>10</td><td class="title">3.6%</td><td>24.5%</td><td class="releg">4.9%</td><td>8</td><td>3–15</td></tr>
-      <tr><td>4</td><td>Brentford</td><td>5</td><td>+6</td><td>9</td><td class="title">6.8%</td><td>34.3%</td><td class="releg">4.5%</td><td>8</td><td>2–14</td></tr>
-      <tr><td>5</td><td>Leeds United</td><td>5</td><td>+4</td><td>9</td><td class="title">3.4%</td><td>22.9%</td><td class="releg">6.4%</td><td>8</td><td>3–15</td></tr>
-      <tr><td>6</td><td>Liverpool</td><td>5</td><td>+3</td><td>9</td><td class="title">7.1%</td><td>36.5%</td><td class="releg">4.5%</td><td>7</td><td>2–14</td></tr>
-      <tr><td>7</td><td>Everton</td><td>5</td><td>+3</td><td>9</td><td class="title">3.3%</td><td>22.9%</td><td class="releg">6.5%</td><td>8</td><td>3–15</td></tr>
-      <tr><td>8</td><td>Hull City</td><td>5</td><td>+2</td><td>8</td><td class="title">1.0%</td><td>8.5%</td><td class="releg">13.4%</td><td>11</td><td>5–18</td></tr>
-      <tr><td>9</td><td>Newcastle</td><td>5</td><td>+0</td><td>8</td><td class="title">2.3%</td><td>16.3%</td><td class="releg">9.4%</td><td>10</td><td>4–17</td></tr>
-      <tr><td>10</td><td>Chelsea</td><td>5</td><td>-2</td><td>7</td><td class="title">2.0%</td><td>13.0%</td><td class="releg">12.1%</td><td>10</td><td>4–18</td></tr>
-      <tr><td>11</td><td>Ipswich Town</td><td>5</td><td>-4</td><td>6</td><td class="title">0.4%</td><td>3.3%</td><td class="releg">27.5%</td><td>14</td><td>8–20</td></tr>
-      <tr><td>12</td><td>Man United</td><td>5</td><td>+0</td><td>5</td><td class="title">4.1%</td><td>15.3%</td><td class="releg">12.6%</td><td>11</td><td>4–18</td></tr>
-      <tr><td>13</td><td>Nottingham</td><td>5</td><td>-1</td><td>5</td><td class="title">0.5%</td><td>3.2%</td><td class="releg">28.7%</td><td>14</td><td>8–20</td></tr>
-      <tr><td>14</td><td>Sunderland</td><td>5</td><td>-4</td><td>4</td><td class="title">1.6%</td><td>6.7%</td><td class="releg">22.6%</td><td>12</td><td>6–20</td></tr>
-      <tr><td>15</td><td>Crystal Palace</td><td>5</td><td>-5</td><td>4</td><td class="title">0.6%</td><td>3.4%</td><td class="releg">31.5%</td><td>14</td><td>8–20</td></tr>
-      <tr><td>16</td><td>Aston Villa</td><td>5</td><td>-5</td><td>4</td><td class="title">1.9%</td><td>7.9%</td><td class="releg">21.2%</td><td>12</td><td>5–20</td></tr>
-      <tr><td>17</td><td>Bournemouth</td><td>5</td><td>-2</td><td>3</td><td class="title">2.0%</td><td>6.5%</td><td class="releg">24.0%</td><td>13</td><td>6–20</td></tr>
-      <tr><td>18</td><td>Coventry City</td><td>5</td><td>-9</td><td>3</td><td class="title">0.2%</td><td>1.0%</td><td class="releg">53.0%</td><td>18</td><td>11–20</td></tr>
-      <tr><td>19</td><td>Fulham</td><td>5</td><td>-3</td><td>2</td><td class="title">1.0%</td><td>3.2%</td><td class="releg">35.6%</td><td>14</td><td>9–20</td></tr>
-      <tr><td>20</td><td>Tottenham</td><td>5</td><td>-6</td><td>2</td><td class="title">0.4%</td><td>1.6%</td><td class="releg">47.4%</td><td>17</td><td>10–20</td></tr>
+      <tr data-team="Man City"><td>1</td><td>Man City</td><td>5</td><td>+8</td><td>15</td><td class="title">43.4%</td><td>86.7%</td><td class="releg">0.5%</td><td>2</td><td>1–7</td></tr>
+      <tr data-team="Arsenal"><td>2</td><td>Arsenal</td><td>5</td><td>+4</td><td>12</td><td class="title">14.7%</td><td>68.8%</td><td class="releg">1.4%</td><td>4</td><td>1–10</td></tr>
+      <tr data-team="Brighton Hove"><td>3</td><td>Brighton Hove</td><td>5</td><td>+11</td><td>10</td><td class="title">3.6%</td><td>25.6%</td><td class="releg">4.1%</td><td>8</td><td>3–15</td></tr>
+      <tr data-team="Brentford"><td>4</td><td>Brentford</td><td>5</td><td>+6</td><td>9</td><td class="title">6.8%</td><td>39.5%</td><td class="releg">3.7%</td><td>8</td><td>2–14</td></tr>
+      <tr data-team="Leeds United"><td>5</td><td>Leeds United</td><td>5</td><td>+4</td><td>9</td><td class="title">3.4%</td><td>23.9%</td><td class="releg">5.3%</td><td>8</td><td>3–15</td></tr>
+      <tr data-team="Liverpool"><td>6</td><td>Liverpool</td><td>5</td><td>+3</td><td>9</td><td class="title">7.0%</td><td>38.0%</td><td class="releg">3.7%</td><td>7</td><td>2–14</td></tr>
+      <tr data-team="Everton"><td>7</td><td>Everton</td><td>5</td><td>+3</td><td>9</td><td class="title">3.3%</td><td>24.0%</td><td class="releg">5.4%</td><td>8</td><td>3–15</td></tr>
+      <tr data-team="Hull City"><td>8</td><td>Hull City</td><td>5</td><td>+2</td><td>8</td><td class="title">1.0%</td><td>8.9%</td><td class="releg">11.1%</td><td>11</td><td>5–18</td></tr>
+      <tr data-team="Newcastle"><td>9</td><td>Newcastle</td><td>5</td><td>+0</td><td>8</td><td class="title">2.3%</td><td>17.0%</td><td class="releg">7.8%</td><td>9</td><td>4–17</td></tr>
+      <tr data-team="Chelsea"><td>10</td><td>Chelsea</td><td>5</td><td>-2</td><td>7</td><td class="title">2.0%</td><td>13.6%</td><td class="releg">10.1%</td><td>10</td><td>4–18</td></tr>
+      <tr data-team="Ipswich Town"><td>11</td><td>Ipswich Town</td><td>5</td><td>-4</td><td>6</td><td class="title">0.4%</td><td>3.4%</td><td class="releg">22.9%</td><td>14</td><td>8–20</td></tr>
+      <tr data-team="Man United"><td>12</td><td>Man United</td><td>5</td><td>+0</td><td>5</td><td class="title">4.0%</td><td>15.8%</td><td class="releg">10.4%</td><td>11</td><td>4–18</td></tr>
+      <tr data-team="Nottingham"><td>13</td><td>Nottingham</td><td>5</td><td>-1</td><td>5</td><td class="title">0.5%</td><td>3.3%</td><td class="releg">23.9%</td><td>13</td><td>8–20</td></tr>
+      <tr data-team="Sunderland"><td>14</td><td>Sunderland</td><td>5</td><td>-4</td><td>4</td><td class="title">1.6%</td><td>7.0%</td><td class="releg">18.8%</td><td>12</td><td>6–20</td></tr>
+      <tr data-team="Crystal Palace"><td>15</td><td>Crystal Palace</td><td>5</td><td>-5</td><td>4</td><td class="title">0.6%</td><td>3.5%</td><td class="releg">26.2%</td><td>14</td><td>8–20</td></tr>
+      <tr data-team="Aston Villa"><td>16</td><td>Aston Villa</td><td>5</td><td>-5</td><td>4</td><td class="title">1.8%</td><td>8.2%</td><td class="releg">17.6%</td><td>12</td><td>5–20</td></tr>
+      <tr data-team="Bournemouth"><td>17</td><td>Bournemouth</td><td>5</td><td>-2</td><td>3</td><td class="title">2.0%</td><td>6.8%</td><td class="releg">13.9%</td><td>13</td><td>6–20</td></tr>
+      <tr data-team="Coventry City"><td>18</td><td>Coventry City</td><td>5</td><td>-9</td><td>3</td><td class="title">0.2%</td><td>1.0%</td><td class="releg">44.1%</td><td>18</td><td>11–20</td></tr>
+      <tr data-team="Fulham"><td>19</td><td>Fulham</td><td>5</td><td>-3</td><td>2</td><td class="title">1.0%</td><td>3.3%</td><td class="releg">29.6%</td><td>14</td><td>9–20</td></tr>
+      <tr data-team="Tottenham"><td>20</td><td>Tottenham</td><td>5</td><td>-6</td><td>2</td><td class="title">0.4%</td><td>1.6%</td><td class="releg">39.4%</td><td>17</td><td>10–20</td></tr>
     </tbody>
   </table>
+
+  <div id="trajectory">
+    <button class="close-btn" onclick="closeTrajectory()">✕ close</button>
+    <h2 id="traj-title">Team</h2>
+    <p class="sub" id="traj-sub"></p>
+    <div class="chart-wrap"><canvas id="traj-canvas"></canvas></div>
+    <div class="legend">
+      <span><span class="swatch" style="background:#F2A93B;"></span>Title</span>
+      <span><span class="swatch" style="background:#4FA8A0;"></span>Top&nbsp;4</span>
+      <span><span class="swatch" style="background:#E0654F;"></span>Relegation</span>
+    </div>
+  </div>
+
+  <div id="highlights">
+    <strong>At matchday 5, historically&hellip;</strong>
+    <ul>
+      <li>The lowest title chance ever given to an eventual champion at this stage (matchday 5) was just <em>0.5%</em>, for <em>Liverpool</em> in 1905/1906 — and they still won it.</li>
+      <li>The highest title chance ever given to a team that did not go on to win the league was <em>66.2%</em>, for <em>Chelsea</em> in 2010/2011.</li>
+      <li>The lowest top-4 chance ever given to a team that still finished in the top four was <em>2.1%</em>, for <em>Liverpool</em> in 1905/1906.</li>
+      <li>The highest top-4 chance ever given to a team that then missed out was <em>84.0%</em>, for <em>Manchester United</em> in 1957/1958.</li>
+      <li>The biggest great escape: <em>Notts County</em> were given just a <em>70.3%</em> chance of staying up at this stage in 1889/1890 — and survived anyway.</li>
+      <li>The biggest shock relegation: <em>Blackburn Rovers</em> had only a <em>2.8%</em> relegation risk at this stage in 1935/1936, and still went down.</li>
+    </ul>
+    <p class="sub">Based on every complete English top-flight season since 1888/89, compared at the equivalent % of the season played.</p>
+  </div>
+
+  <p class="note">
+    Tap any team's row to see how their modelled odds have moved matchday-by-matchday this season so far.
+  </p>
   <p class="note">
     Assumes a standard bottom-3 relegation zone. "Previous season" means each team's actual finishing position last time they were in the top flight;
     newly promoted or unrecognised teams are treated as if they finished below the bottom of the previous table. Percentages are a historical-comparison
     model, not a live bookmaker forecast — see the <a href="index.html">interactive version</a> for the full methodology and uncertainty ranges.
+    Each team's raw percentage comes from its own independent model, so each column is rescaled to sum to the number of real spots on offer
+    (100% for the title, 400% across four Europe spots, 300% across three relegation spots) rather than left to add up to whatever they happen to.
   </p>
   <p class="note">
     "Median" and "80% range" come from stitching together 19 separately-fitted models (one per possible finishing position) into a single probability
@@ -69,5 +117,63 @@
   <p class="note">
     Regenerated automatically on a schedule via GitHub Actions.
   </p>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const TRAJECTORIES = {"Brighton Hove":[{"matchday":1,"played":1,"title_pct":4.3,"top4_pct":21.2,"releg_pct":32.3},{"matchday":2,"played":2,"title_pct":2.0,"top4_pct":9.0,"releg_pct":29.3},{"matchday":3,"played":3,"title_pct":1.6,"top4_pct":8.8,"releg_pct":22.1},{"matchday":4,"played":4,"title_pct":2.8,"top4_pct":16.2,"releg_pct":10.8},{"matchday":5,"played":5,"title_pct":3.6,"top4_pct":25.6,"releg_pct":4.1}],"Arsenal":[{"matchday":1,"played":1,"title_pct":22.3,"top4_pct":65.7,"releg_pct":17.1},{"matchday":2,"played":2,"title_pct":18.9,"top4_pct":61.9,"releg_pct":7.2},{"matchday":3,"played":3,"title_pct":21.2,"top4_pct":65.0,"releg_pct":2.5},{"matchday":4,"played":4,"title_pct":28.9,"top4_pct":82.2,"releg_pct":1.1},{"matchday":5,"played":5,"title_pct":14.7,"top4_pct":68.8,"releg_pct":1.4}],"Brentford":[{"matchday":1,"played":1,"title_pct":11.9,"top4_pct":47.4,"releg_pct":23.0},{"matchday":2,"played":2,"title_pct":7.7,"top4_pct":29.2,"releg_pct":16.0},{"matchday":3,"played":3,"title_pct":6.4,"top4_pct":27.4,"releg_pct":10.2},{"matchday":4,"played":4,"title_pct":5.3,"top4_pct":24.1,"releg_pct":9.1},{"matchday":5,"played":5,"title_pct":6.8,"top4_pct":39.5,"releg_pct":3.7}],"Hull City":[{"matchday":1,"played":1,"title_pct":3.1,"top4_pct":19.3,"releg_pct":33.4},{"matchday":2,"played":2,"title_pct":2.6,"top4_pct":20.2,"releg_pct":19.2},{"matchday":3,"played":3,"title_pct":2.2,"top4_pct":17.5,"releg_pct":12.5},{"matchday":4,"played":4,"title_pct":1.7,"top4_pct":13.3,"releg_pct":10.9},{"matchday":5,"played":5,"title_pct":1.0,"top4_pct":8.9,"releg_pct":11.1}],"Everton":[{"matchday":1,"played":1,"title_pct":7.6,"top4_pct":36.6,"releg_pct":26.7},{"matchday":2,"played":2,"title_pct":4.9,"top4_pct":22.1,"releg_pct":19.2},{"matchday":3,"played":3,"title_pct":4.0,"top4_pct":20.5,"releg_pct":12.8},{"matchday":4,"played":4,"title_pct":3.2,"top4_pct":17.4,"releg_pct":11.4},{"matchday":5,"played":5,"title_pct":3.3,"top4_pct":24.0,"releg_pct":5.4}],"Ipswich Town":[{"matchday":1,"played":1,"title_pct":2.7,"top4_pct":18.2,"releg_pct":33.9},{"matchday":2,"played":2,"title_pct":1.1,"top4_pct":6.7,"releg_pct":30.3},{"matchday":3,"played":3,"title_pct":0.6,"top4_pct":4.2,"releg_pct":31.8},{"matchday":4,"played":4,"title_pct":0.7,"top4_pct":6.0,"releg_pct":21.5},{"matchday":5,"played":5,"title_pct":0.4,"top4_pct":3.4,"releg_pct":22.9}],"Leeds United":[{"matchday":1,"played":1,"title_pct":6.2,"top4_pct":32.9,"releg_pct":28.1},{"matchday":2,"played":2,"title_pct":4.0,"top4_pct":19.7,"releg_pct":20.5},{"matchday":3,"played":3,"title_pct":3.3,"top4_pct":18.1,"releg_pct":13.9},{"matchday":4,"played":4,"title_pct":4.5,"top4_pct":28.2,"releg_pct":6.8},{"matchday":5,"played":5,"title_pct":3.4,"top4_pct":23.9,"releg_pct":5.3}],"Man City":[{"matchday":1,"played":1,"title_pct":17.2,"top4_pct":60.4,"releg_pct":19.1},{"matchday":2,"played":2,"title_pct":17.6,"top4_pct":60.3,"releg_pct":7.5},{"matchday":3,"played":3,"title_pct":19.8,"top4_pct":63.8,"releg_pct":2.6},{"matchday":4,"played":4,"title_pct":22.6,"top4_pct":80.1,"releg_pct":1.2},{"matchday":5,"played":5,"title_pct":43.4,"top4_pct":86.7,"releg_pct":0.5}],"Chelsea":[{"matchday":1,"played":1,"title_pct":8.9,"top4_pct":41.5,"releg_pct":25.1},{"matchday":2,"played":2,"title_pct":7.6,"top4_pct":59.1,"releg_pct":11.8},{"matchday":3,"played":3,"title_pct":5.2,"top4_pct":30.6,"releg_pct":9.4},{"matchday":4,"played":4,"title_pct":4.2,"top4_pct":24.8,"releg_pct":8.3},{"matchday":5,"played":5,"title_pct":2.0,"top4_pct":13.6,"releg_pct":10.1}],"Newcastle":[{"matchday":1,"played":1,"title_pct":5.5,"top4_pct":22.4,"releg_pct":33.0},{"matchday":2,"played":2,"title_pct":5.3,"top4_pct":23.5,"releg_pct":18.5},{"matchday":3,"played":3,"title_pct":4.4,"top4_pct":21.8,"releg_pct":12.2},{"matchday":4,"played":4,"title_pct":2.3,"top4_pct":12.1,"releg_pct":15.6},{"matchday":5,"played":5,"title_pct":2.3,"top4_pct":17.0,"releg_pct":7.8}],"Liverpool":[{"matchday":1,"played":1,"title_pct":10.3,"top4_pct":34.5,"releg_pct":28.3},{"matchday":2,"played":2,"title_pct":6.7,"top4_pct":19.4,"releg_pct":21.1},{"matchday":3,"played":3,"title_pct":8.3,"top4_pct":32.4,"releg_pct":8.9},{"matchday":4,"played":4,"title_pct":6.8,"top4_pct":29.0,"releg_pct":7.9},{"matchday":5,"played":5,"title_pct":7.0,"top4_pct":38.0,"releg_pct":3.7}],"Man United":[{"matchday":2,"played":2,"title_pct":9.6,"top4_pct":29.4,"releg_pct":16.1},{"matchday":3,"played":3,"title_pct":8.1,"top4_pct":28.8,"releg_pct":10.5},{"matchday":4,"played":4,"title_pct":5.4,"top4_pct":19.2,"releg_pct":12.5},{"matchday":5,"played":5,"title_pct":4.0,"top4_pct":15.8,"releg_pct":10.4}],"Sunderland":[{"matchday":2,"played":2,"title_pct":6.1,"top4_pct":22.5,"releg_pct":19.4},{"matchday":3,"played":3,"title_pct":5.1,"top4_pct":21.7,"releg_pct":13.1},{"matchday":4,"played":4,"title_pct":2.9,"top4_pct":12.8,"releg_pct":16.2},{"matchday":5,"played":5,"title_pct":1.6,"top4_pct":7.0,"releg_pct":18.8}],"Nottingham":[{"matchday":2,"played":2,"title_pct":1.0,"top4_pct":3.9,"releg_pct":38.0},{"matchday":3,"played":3,"title_pct":0.8,"top4_pct":4.0,"releg_pct":33.5},{"matchday":4,"played":4,"title_pct":0.9,"top4_pct":5.7,"releg_pct":23.1},{"matchday":5,"played":5,"title_pct":0.5,"top4_pct":3.3,"releg_pct":23.9}],"Bournemouth":[{"matchday":2,"played":2,"title_pct":5.0,"top4_pct":13.0,"releg_pct":25.9},{"matchday":3,"played":3,"title_pct":4.1,"top4_pct":14.1,"releg_pct":19.2},{"matchday":4,"played":4,"title_pct":3.3,"top4_pct":11.6,"releg_pct":18.3},{"matchday":5,"played":5,"title_pct":2.0,"top4_pct":6.8,"releg_pct":13.9}],"Crystal Palace":[{"matchday":3,"played":3,"title_pct":1.4,"top4_pct":7.7,"releg_pct":24.9},{"matchday":4,"played":4,"title_pct":0.9,"top4_pct":4.4,"releg_pct":25.1},{"matchday":5,"played":5,"title_pct":0.6,"top4_pct":3.5,"releg_pct":26.2}],"Tottenham":[{"matchday":3,"played":3,"title_pct":0.8,"top4_pct":3.7,"releg_pct":35.8},{"matchday":4,"played":4,"title_pct":0.6,"top4_pct":2.9,"releg_pct":37.0},{"matchday":5,"played":5,"title_pct":0.4,"top4_pct":1.6,"releg_pct":39.4}],"Aston Villa":[{"matchday":3,"played":3,"title_pct":2.9,"top4_pct":10.0,"releg_pct":24.3},{"matchday":4,"played":4,"title_pct":1.8,"top4_pct":5.7,"releg_pct":29.7},{"matchday":5,"played":5,"title_pct":1.8,"top4_pct":8.2,"releg_pct":17.6}],"Fulham":[{"matchday":4,"played":4,"title_pct":1.3,"top4_pct":4.1,"releg_pct":33.7},{"matchday":5,"played":5,"title_pct":1.0,"top4_pct":3.3,"releg_pct":29.6}],"Coventry City":[{"matchday":5,"played":5,"title_pct":0.2,"top4_pct":1.0,"releg_pct":44.1}]};
+let trajChart = null;
+
+function closeTrajectory() {
+  document.getElementById('trajectory').classList.remove('visible');
+  document.querySelectorAll('tbody tr.open').forEach(r => r.classList.remove('open'));
+}
+
+function showTrajectory(team, row) {
+  const data = TRAJECTORIES[team];
+  const box = document.getElementById('trajectory');
+  if (!data || !data.length) {
+    document.getElementById('traj-title').textContent = team;
+    document.getElementById('traj-sub').textContent = "No match-by-match data yet this season.";
+    if (trajChart) { trajChart.destroy(); trajChart = null; }
+    box.classList.add('visible');
+    return;
+  }
+  document.querySelectorAll('tbody tr.open').forEach(r => r.classList.remove('open'));
+  if (row) row.classList.add('open');
+
+  document.getElementById('traj-title').textContent = team;
+  document.getElementById('traj-sub').textContent =
+    'Modelled odds after each matchday this season (' + data.length + ' played so far)';
+
+  const labels = data.map(d => 'MD' + d.matchday);
+  const ctx = document.getElementById('traj-canvas').getContext('2d');
+  if (trajChart) trajChart.destroy();
+  trajChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        { label: 'Title', data: data.map(d => d.title_pct), borderColor: '#F2A93B', backgroundColor: '#F2A93B', borderWidth: 2, pointRadius: 2, tension: 0.2 },
+        { label: 'Top 4', data: data.map(d => d.top4_pct), borderColor: '#4FA8A0', backgroundColor: '#4FA8A0', borderWidth: 2, pointRadius: 2, tension: 0.2 },
+        { label: 'Relegation', data: data.map(d => d.releg_pct), borderColor: '#E0654F', backgroundColor: '#E0654F', borderWidth: 2, pointRadius: 2, tension: 0.2 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#9FB1C4', font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }, grid: { color: '#2A415F' } },
+        y: { min: 0, max: 100, ticks: { color: '#9FB1C4', font: { size: 11 }, callback: v => v + '%' }, grid: { color: '#2A415F' } }
+      }
+    }
+  });
+  box.classList.add('visible');
+  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+document.querySelectorAll('tbody tr').forEach(row => {
+  row.addEventListener('click', () => showTrajectory(row.dataset.team, row));
+});
+</script>
 </body>
 </html>
