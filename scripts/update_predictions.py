@@ -576,7 +576,7 @@ def render_highlights_html(highlights):
              "The highest top-4 chance ever given to a team that then missed out was <em>{pct:.1f}%</em>, "
              "for <em>{team}</em> in {season}."),
         line("great_escape",
-             "The biggest great escape: <em>{team}</em> were given just a <em>{pct:.1f}%</em> chance of staying up "
+             "The biggest great escape: <em>{team}</em> had an <em>{pct:.1f}%</em> chance of being relegated "
              "at this stage in {season} \u2014 and survived anyway."),
         line("shock_relegation",
              "The biggest shock relegation: <em>{team}</em> had only a <em>{pct:.1f}%</em> relegation risk "
