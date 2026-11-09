@@ -269,28 +269,48 @@ def fetch_live_table(token):
     return sorted(table, key=lambda r: r["position"])
 
 
+def current_pl_season_start_year():
+    """The Premier League season spanning 'now': Aug-Dec counts as the year it
+    starts, Jan-Jul counts as the previous year's season (e.g. March 2027 is
+    still the 2026/27 season)."""
+    now = datetime.now(timezone.utc)
+    return now.year if now.month >= 7 else now.year - 1
+
 def fetch_season_matches(token):
     """Every finished match of the current PL season so far, grouped by matchday
-    (in chronological matchday order) so a trajectory can be replayed from them."""
+    (in chronological matchday order) so a trajectory can be replayed from them.
+    The season is passed explicitly rather than relying on the API's own
+    "defaults to current season" behaviour, since an implicit default is exactly
+    the kind of thing that's easy to get subtly wrong without noticing."""
+    season = current_pl_season_start_year()
     req = urllib.request.Request(
-        "https://api.football-data.org/v4/competitions/PL/matches?status=FINISHED",
+        f"https://api.football-data.org/v4/competitions/PL/matches?status=FINISHED&season={season}&limit=500",
         headers={"X-Auth-Token": token},
     )
     with urllib.request.urlopen(req, timeout=30) as resp:
         data = json.load(resp)
 
+    all_matches = data.get("matches", [])
     by_matchday = defaultdict(list)
-    for m in data.get("matches", []):
+    skipped = 0
+    for m in all_matches:
         md = m.get("matchday")
         ft = m.get("score", {}).get("fullTime", {})
         hg, ag = ft.get("home"), ft.get("away")
         if md is None or hg is None or ag is None:
+            skipped += 1
             continue  # unplayed, abandoned, or an oddity without a normal round number
         home = m["homeTeam"].get("shortName") or m["homeTeam"]["name"]
         away = m["awayTeam"].get("shortName") or m["awayTeam"]["name"]
         by_matchday[md].append((home, away, hg, ag))
 
-    return sorted(by_matchday.items())  # [(matchday, [(home, away, hg, ag), ...]), ...]
+    result = sorted(by_matchday.items())
+    mds = [md for md, _ in result]
+    print(f"fetch_season_matches: season={season}, API returned {len(all_matches)} matches, "
+          f"{skipped} skipped (no matchday/score), {len(mds)} distinct matchdays "
+          f"({min(mds) if mds else '-'}\u2013{max(mds) if mds else '-'})", file=sys.stderr)
+
+    return result  # [(matchday, [(home, away, hg, ag), ...]), ...]
 
 
 # ---------- Step 4: attach each live team's previous-season position ----------
@@ -323,7 +343,7 @@ def attach_previous_season(table, seasons_sorted, season_rows, final_rank_by_sea
 
 # ---------- Step 5: compute predictions and render the page ----------
 
-def compute_predictions(table, models_by_K, season_len=38, conf=0.80, win_pts=3, n_releg_spots=None, normalize=True):
+def compute_predictions(table, models_by_K, season_len=38, win_pts=3, n_releg_spots=None, normalize=True):
     N = len(table)
 
     results = []
@@ -366,13 +386,7 @@ def compute_predictions(table, models_by_K, season_len=38, conf=0.80, win_pts=3,
             safety_K = N - 3 if N >= 5 else N  # standard modern-PL assumption
         releg_pct = (1 - cdf[safety_K]) * 100
 
-        lo_target, hi_target = (1 - conf) / 2, 1 - (1 - conf) / 2
-        median = next(K for K in range(1, N + 1) if cdf[K] >= 0.5)
-        range_lo = next(K for K in range(1, N + 1) if cdf[K] >= lo_target)
-        range_hi = next(K for K in range(1, N + 1) if cdf[K] >= hi_target)
-
-        results.append({**team, "title_pct": title_pct, "top4_pct": top4_pct, "releg_pct": releg_pct,
-                         "median_pos": median, "range_lo": range_lo, "range_hi": range_hi})
+        results.append({**team, "title_pct": title_pct, "top4_pct": top4_pct, "releg_pct": releg_pct})
 
     if not normalize:
         # Used when scanning history for genuine precedents (compute_historical_highlights):
@@ -674,7 +688,7 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
   <h1>Premier League — modelled title, top-4 &amp; relegation odds</h1>
   <p class="updated">Last updated {updated} UTC. Model: points, goal difference, previous-season finishing position &amp; games in hand, {n_obs:,} historical observations. Source: {source_label}.</p>
   <table>
-    <thead><tr><th>#</th><th>Team</th><th>Pld</th><th>GD</th><th>Pts</th><th>Title</th><th>Top&nbsp;4</th><th>Releg.</th><th>Median</th><th>80%&nbsp;range</th></tr></thead>
+    <thead><tr><th>#</th><th>Team</th><th>Pld</th><th>GD</th><th>Pts</th><th>Title</th><th>Top&nbsp;4</th><th>Releg.</th></tr></thead>
     <tbody>
 {rows}
     </tbody>
@@ -705,12 +719,6 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
     (100% for the title, 400% across four Europe spots, 300% across three relegation spots) rather than left to add up to whatever they happen to.
   </p>
   <p class="note">
-    "Median" and "80% range" come from stitching together 19 separately-fitted models (one per possible finishing position) into a single probability
-    curve over final position, then reading off the middle 80% of it. Unlike the title/top-4/relegation percentages, this hasn't been through the same
-    held-out historical validation — treat it as a genuine extrapolation of the same method, not an equally-tested one. Positions with no real competitive
-    stakes attached (mid-table finishes nobody is actually chasing) have thinner, noisier historical support than the title, Europe, or relegation cutoffs do.
-  </p>
-  <p class="note">
     Regenerated automatically on a schedule via GitHub Actions.
   </p>
 </body>
@@ -718,8 +726,7 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
 """
 
 ROW_TEMPLATE = ("      <tr data-team=\"{name_attr}\"><td>{position}</td><td>{name}</td><td>{played}</td><td>{gd:+d}</td><td>{points}</td>"
-                 "<td class=\"title\">{title_pct:.1f}%</td><td>{top4_pct:.1f}%</td><td class=\"releg\">{releg_pct:.1f}%</td>"
-                 "<td>{median_pos}</td><td>{range_lo}\u2013{range_hi}</td></tr>")
+                 "<td class=\"title\">{title_pct:.1f}%</td><td>{top4_pct:.1f}%</td><td class=\"releg\">{releg_pct:.1f}%</td></tr>")
 
 TRAJECTORY_SCRIPT = """<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
